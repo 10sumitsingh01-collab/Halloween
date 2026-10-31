@@ -325,7 +325,7 @@ curl -s -H "X-API-Key: test_caregiver_key_123" http://localhost:8000/api/v1/dose
 ### Stopping Escalation via Patient Confirmation
 At any time before the dose becomes missed, the patient can confirm taking the medication:
 ```bash
-curl -X POST -H "X-API-Key: test_patient_key_456" http://localhost:8000/api/v1/doses/<DOSE_ID>/confirm
+curl -X POST -H "X-API-Key: test_patient_key_456" http://localhost:8000/api/v1/doses/<DOSE_ID>/taken
 ```
 This updates the dose status to `taken` (or `late`), stopping further escalation and acknowledging open logs.
 

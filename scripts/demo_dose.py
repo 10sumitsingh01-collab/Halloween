@@ -76,7 +76,7 @@ def create_demo_dose(seconds: int = 20) -> DoseEvent:
         print("\nTo inspect escalation logs in real-time:")
         print(f'  curl -H "X-API-Key: test_caregiver_key_123" http://localhost:8000/api/v1/doses/{dose.id}/escalations')
         print("\nTo confirm the dose (as patient):")
-        print(f'  curl -X POST -H "X-API-Key: test_patient_key_456" http://localhost:8000/api/v1/doses/{dose.id}/confirm')
+        print(f'  curl -X POST -H "X-API-Key: test_patient_key_456" http://localhost:8000/api/v1/doses/{dose.id}/taken')
         print("===========================================\n")
         return dose
     finally:
