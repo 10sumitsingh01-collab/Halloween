@@ -1,0 +1,1 @@
+"""MedMate Application Package"""

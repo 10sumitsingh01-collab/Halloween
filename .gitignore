@@ -1,0 +1,9 @@
+.venv/
+venv/
+.env
+*.db
+*.db.bak
+medmate.db
+__pycache__/
+.pytest_cache/
+*.pyc
