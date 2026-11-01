@@ -18,7 +18,7 @@ from app.models.caregiver import Caregiver
 from app.models.enums import DoseStatus, EscalationStatus, NotifyLevel
 from app.services.clock import ensure_utc, utc_now
 from app.services.dose_engine import reminder_time, mark_overdue_as_missed
-from app.notifiers.base import BaseNotifier
+from app.notifiers.base import BaseNotifier, PermanentNotifierError
 from app.notifiers.templates import (
     format_patient_reminder,
     format_caregiver_unconfirmed_alert,
@@ -133,13 +133,15 @@ def try_send(
     channel: str = "unknown",
     patient: Optional[Patient] = None,
     caregiver: Optional[Caregiver] = None,
+    contact_attr: str = "whatsapp_id",
 ) -> str:
     """
     Attempt to deliver a notification with per-send commit and retry tracking:
       - If already 'sent' or 'failed', skip.
       - If missing recipient contact, fail immediately with detail and no retries.
       - On send success: status='sent', sent_at=now.
-      - On send failure: increment attempts. If attempts >= 3, status='failed'.
+      - On permanent failure (PermanentNotifierError): status='failed', attempts=1, detail='recipient unreachable', no retries.
+      - On transient failure / other exception: increment attempts. If attempts >= 3, status='failed'.
       - Detail contains only fixed strings or the exception CLASS NAME (no raw text).
     Commits to DB after EVERY send attempt.
     Returns: 'sent', 'failed', or 'skipped'.
@@ -150,27 +152,40 @@ def try_send(
 
     # Contact check for patient recipient
     if recipient == "patient":
-        if not patient or not getattr(patient, "whatsapp_id", None):
+        contact_val = getattr(patient, contact_attr, None) if patient else None
+        if not patient or not contact_val:
             row.status = EscalationStatus.FAILED
             row.attempts = 1
-            row.detail = "patient has no whatsapp_id"
+            row.detail = f"patient has no {contact_attr}"
             db.commit()
             return "failed"
 
     # Contact check for caregiver recipient
     if recipient.startswith("caregiver:"):
-        if not caregiver or not getattr(caregiver, "whatsapp_id", None):
+        contact_val = getattr(caregiver, contact_attr, None) if caregiver else None
+        if not caregiver or not contact_val:
             row.status = EscalationStatus.FAILED
             row.attempts = 1
-            row.detail = "caregiver has no whatsapp_id"
+            row.detail = f"caregiver has no {contact_attr}"
             db.commit()
             return "failed"
 
     # Invoke delivery callback
     try:
         ok = bool(send_fn())
+    except PermanentNotifierError:
+        row.status = EscalationStatus.FAILED
+        row.attempts = 1
+        row.detail = "recipient unreachable"
+        db.commit()
+        return "failed"
     except Exception as exc:
-        logger.warning("Notifier exception for dose %s step %s: %s", dose.id, step, exc)
+        logger.warning(
+            "Notifier exception for dose %s step %s: %s",
+            dose.id,
+            step,
+            exc.__class__.__name__,
+        )
         ok = False
         # Privacy: Store only the exception class name, never raw exception text
         row.detail = exc.__class__.__name__
@@ -213,6 +228,7 @@ def run_patient_ladder(
     med = dose.schedule.medication
     patient = med.patient
     channel = getattr(notifier, "channel", "unknown")
+    contact_attr = getattr(notifier, "contact_attr", "whatsapp_id")
 
     # 1. Snooze handling
     if dose.snoozed_until is not None:
@@ -233,6 +249,7 @@ def run_patient_ladder(
                 now=now,
                 channel=channel,
                 patient=patient,
+                contact_attr=contact_attr,
             )
             record_summary(summary, snooze_step, res_snooze)
 
@@ -285,6 +302,7 @@ def run_patient_ladder(
             now=now,
             channel=channel,
             patient=patient,
+            contact_attr=contact_attr,
         )
         record_summary(summary, "REMINDER_1", res1)
     else:
@@ -306,6 +324,7 @@ def run_patient_ladder(
                 now=now,
                 channel=channel,
                 patient=patient,
+                contact_attr=contact_attr,
             )
             record_summary(summary, "REMINDER_1", res1)
 
@@ -362,6 +381,7 @@ def run_patient_ladder(
             now=now,
             channel=channel,
             patient=patient,
+            contact_attr=contact_attr,
         )
         record_summary(summary, cur_step, res_k)
         break
@@ -392,6 +412,7 @@ def run_caregiver_unconfirmed(
     patient = dose.schedule.medication.patient
     caregivers = patient.caregivers
     channel = getattr(notifier, "channel", "unknown")
+    contact_attr = getattr(notifier, "contact_attr", "whatsapp_id")
 
     for caregiver in caregivers:
         level = getattr(caregiver.notify_level, "value", caregiver.notify_level)
@@ -408,6 +429,7 @@ def run_caregiver_unconfirmed(
             now=now,
             channel=channel,
             caregiver=caregiver,
+            contact_attr=contact_attr,
         )
         record_summary(summary, "CAREGIVER_UNCONFIRMED", res)
 
@@ -437,6 +459,7 @@ def run_missed_alert(
     patient = dose.schedule.medication.patient
     caregivers = patient.caregivers
     channel = getattr(notifier, "channel", "unknown")
+    contact_attr = getattr(notifier, "contact_attr", "whatsapp_id")
 
     for caregiver in caregivers:
         level = getattr(caregiver.notify_level, "value", caregiver.notify_level)
@@ -453,6 +476,7 @@ def run_missed_alert(
             now=now,
             channel=channel,
             caregiver=caregiver,
+            contact_attr=contact_attr,
         )
         record_summary(summary, "MISSED_ALERT", res)
 

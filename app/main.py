@@ -8,9 +8,25 @@ from app.routers import patients, caregivers, medications, doses, admin
 from app.scheduler import start_scheduler, stop_scheduler
 
 
+import logging
+from app.config import settings
+
+logger = logging.getLogger(__name__)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: start background scheduler if enabled
+    # Startup: validate notifier channel & token, fail fast if missing
+    channel = getattr(settings, "NOTIFIER_CHANNEL", "mock").lower()
+    if channel == "telegram":
+        token = settings.TELEGRAM_BOT_TOKEN.get_secret_value() if settings.TELEGRAM_BOT_TOKEN else None
+        if not token or not token.strip():
+            raise RuntimeError("TELEGRAM_BOT_TOKEN must be configured when NOTIFIER_CHANNEL=telegram")
+        logger.info("notifier channel: telegram")
+    else:
+        logger.info("notifier channel: %s", channel)
+
+    # Start background scheduler if enabled
     start_scheduler()
     yield
     # Shutdown: gracefully stop background scheduler

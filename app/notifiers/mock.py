@@ -17,6 +17,7 @@ class MockNotifier(BaseNotifier):
     Mock notifier that logs dispatched notifications in-memory and supports failure injection.
     """
     channel: str = "mock"
+    contact_attr: str = "whatsapp_id"
 
     def __init__(self, print_to_console: bool = True):
         self.print_to_console = print_to_console

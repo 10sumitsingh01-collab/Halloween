@@ -9,9 +9,13 @@ from fastapi.testclient import TestClient
 
 import os
 os.environ["SCHEDULER_ENABLED"] = "false"
+os.environ["NOTIFIER_CHANNEL"] = "mock"
+os.environ["TELEGRAM_BOT_TOKEN"] = ""
 
 from app.config import settings
 settings.SCHEDULER_ENABLED = False
+settings.NOTIFIER_CHANNEL = "mock"
+settings.TELEGRAM_BOT_TOKEN = None
 
 from app.db import Base, get_db
 from app.main import app as fastapi_app

@@ -330,6 +330,36 @@ curl -X POST -H "X-API-Key: test_patient_key_456" http://localhost:8000/api/v1/d
 This updates the dose status to `taken` (or `late`), stopping further escalation and acknowledging open logs.
 
 ---
+
+## Telegram Setup & Account Linking
+
+To link Telegram accounts for real notifications, configure your bot token in `.env`:
+```env
+NOTIFIER_CHANNEL=telegram
+TELEGRAM_BOT_TOKEN=<your_telegram_bot_token>
+TELEGRAM_POLL_ENABLED=true
+```
+
+### Linking Patient and Caregiver Chat IDs
+Use `scripts/link_telegram.py` to link chat IDs directly in the database.
+> **Note**: `scripts/link_telegram.py` should be run with the application server stopped. It reads `DATABASE_URL` directly from settings without hardcoded paths.
+
+```bash
+# Link by explicit Telegram chat ID (chat ID is masked in console output)
+python scripts/link_telegram.py --patient 1 --chat-id 123456789
+python scripts/link_telegram.py --caregiver 2 --chat-id 987654321
+
+# Or link automatically from the latest private chat message to the bot
+python scripts/link_telegram.py --patient 1 --from-latest
+python scripts/link_telegram.py --caregiver 2 --from-latest
+```
+
+To test message delivery to a patient:
+```bash
+python scripts/telegram_test.py --patient 1
+```
+
+---
 ```text
 medmate/
 ├── .env.example

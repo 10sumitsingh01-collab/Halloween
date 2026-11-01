@@ -43,6 +43,7 @@ class Patient(Base):
     wake_time = Column(Time, nullable=False)
     sleep_time = Column(Time, nullable=False)
     whatsapp_id = Column(String, nullable=True)
+    telegram_chat_id = Column(String, nullable=True)
 
 
     caregivers = relationship(

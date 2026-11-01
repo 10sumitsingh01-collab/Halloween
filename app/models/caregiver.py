@@ -11,6 +11,7 @@ class Caregiver(Base):
     name = Column(String, nullable=False)
     phone = Column(String, nullable=False)
     whatsapp_id = Column(String, nullable=False)
+    telegram_chat_id = Column(String, nullable=True)
     relationship = Column(String, nullable=False)
     notify_level = Column(
         Enum(NotifyLevel, native_enum=False),

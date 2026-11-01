@@ -1,4 +1,6 @@
 import os
+from typing import Optional
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -24,6 +26,11 @@ class Settings(BaseSettings):
     SCHEDULER_ENABLED: bool = True
     ESCALATION_LOOKBACK_HOURS: float = 24.0
     MISSED_ALERT_MAX_AGE_MINUTES: float = 60.0
+
+    # Telegram Notifier (Layer 5)
+    NOTIFIER_CHANNEL: str = "mock"
+    TELEGRAM_BOT_TOKEN: Optional[SecretStr] = None
+    TELEGRAM_POLL_ENABLED: bool = True
 
     model_config = SettingsConfigDict(
         env_file=".env",
