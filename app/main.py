@@ -27,6 +27,9 @@ async def lifespan(app: FastAPI):
     else:
         logger.info("notifier channel: %s", channel)
 
+    if getattr(settings, "DOUBLE_DOSE_GUARD_MINUTES", 30.0) <= 0:
+        logger.warning("Double-dose guard is DISABLED (demo mode). Never use this in real use.")
+
     # Start background scheduler if enabled
     start_scheduler()
     # Start Telegram poller if enabled

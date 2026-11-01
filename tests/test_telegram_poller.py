@@ -724,3 +724,34 @@ class TestDoubleDoseAndRegression:
         db_session.refresh(m)
         assert m.stock_remaining == 8.0
 
+    @pytest.mark.anyio
+    async def test_startup_warning_when_double_dose_guard_disabled(self, caplog, monkeypatch):
+        caplog.set_level(logging.WARNING)
+        from app.main import app, lifespan
+
+        monkeypatch.setattr(settings, "DOUBLE_DOSE_GUARD_MINUTES", 0.0)
+        monkeypatch.setattr(settings, "NOTIFIER_CHANNEL", "mock")
+        monkeypatch.setattr(settings, "SCHEDULER_ENABLED", False)
+        monkeypatch.setattr(settings, "TELEGRAM_POLL_ENABLED", False)
+
+        async with lifespan(app):
+            pass
+
+        assert "Double-dose guard is DISABLED (demo mode). Never use this in real use." in caplog.text
+
+    @pytest.mark.anyio
+    async def test_startup_no_warning_when_double_dose_guard_enabled(self, caplog, monkeypatch):
+        caplog.set_level(logging.WARNING)
+        from app.main import app, lifespan
+
+        monkeypatch.setattr(settings, "DOUBLE_DOSE_GUARD_MINUTES", 30.0)
+        monkeypatch.setattr(settings, "NOTIFIER_CHANNEL", "mock")
+        monkeypatch.setattr(settings, "SCHEDULER_ENABLED", False)
+        monkeypatch.setattr(settings, "TELEGRAM_POLL_ENABLED", False)
+
+        async with lifespan(app):
+            pass
+
+        assert "Double-dose guard is DISABLED (demo mode). Never use this in real use." not in caplog.text
+
+

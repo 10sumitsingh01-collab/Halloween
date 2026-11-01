@@ -295,7 +295,7 @@ CAREGIVER_ESCALATION_MINUTES=1.5 SCHEDULER_TICK_SECONDS=5.0 DOUBLE_DOSE_GUARD_MI
 > **Why `DOUBLE_DOSE_GUARD_MINUTES=0` for Demos?**
 > In production, MedMate's Layer 3 clinical safety rules enforce `DOUBLE_DOSE_GUARD_MINUTES=30` by default. If a patient confirms a dose, any subsequent confirmation for the same medication within 30 minutes is safely rejected with:
 > *"Not recorded: a dose of this medicine was confirmed recently. If you have not taken this one, please contact your caregiver."*
-> Setting `DOUBLE_DOSE_GUARD_MINUTES=0` on the CLI explicitly disables the guard so back-to-back demo doses (such as demo Metformin doses created minutes apart) can be confirmed and decremented without waiting 30 minutes.
+> Setting `DOUBLE_DOSE_GUARD_MINUTES=0` on the CLI explicitly disables the guard so back-to-back demo doses (such as demo Metformin doses created minutes apart) can be confirmed and decremented without waiting 30 minutes. At startup, the server will log: `Double-dose guard is DISABLED (demo mode). Never use this in real use.`
 
 ### 2. Create a Demo Dose
 In a separate terminal, schedule a dose for the seed patient ("Lakshmi Devi") to become due in 30 seconds:
