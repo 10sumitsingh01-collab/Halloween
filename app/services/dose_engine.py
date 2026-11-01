@@ -197,10 +197,12 @@ def confirm_taken(
     """
     dose = db.query(DoseEvent).filter(DoseEvent.id == dose_id).first()
     if not dose:
-        raise HTTPException(
+        exc = HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": "Not Found", "detail": f"DoseEvent {dose_id} not found"},
         )
+        exc.code = "not_found"
+        raise exc
 
     now = ensure_utc(clock())
     due_at = ensure_utc(dose.due_at)
@@ -209,7 +211,7 @@ def confirm_taken(
 
     # Rule 1 — Already terminal
     if dose.status in (DoseStatus.TAKEN, DoseStatus.LATE, DoseStatus.SKIPPED):
-        raise HTTPException(
+        exc = HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
                 "error": "Conflict",
@@ -218,11 +220,13 @@ def confirm_taken(
                 ),
             },
         )
+        exc.code = "already_recorded"
+        raise exc
 
     # Rule 2 — Too early
     early_cutoff = due_at - timedelta(minutes=settings.EARLY_WINDOW_MINUTES)
     if now < early_cutoff:
-        raise HTTPException(
+        exc = HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={
                 "error": "Conflict",
@@ -232,43 +236,50 @@ def confirm_taken(
                 ),
             },
         )
+        exc.code = "too_early"
+        raise exc
 
     # Rule 3 — Double-dose guard
-    window_start = now - timedelta(minutes=settings.DOUBLE_DOSE_GUARD_MINUTES)
-    recent = (
-        db.query(DoseEvent)
-        .filter(
-            DoseEvent.schedule_id == dose.schedule_id,
-            DoseEvent.id != dose.id,
-            DoseEvent.status.in_([DoseStatus.TAKEN, DoseStatus.LATE]),
-            DoseEvent.responded_at >= window_start,
+    if settings.DOUBLE_DOSE_GUARD_MINUTES > 0:
+        window_start = now - timedelta(minutes=settings.DOUBLE_DOSE_GUARD_MINUTES)
+        recent = (
+            db.query(DoseEvent)
+            .filter(
+                DoseEvent.schedule_id == dose.schedule_id,
+                DoseEvent.id != dose.id,
+                DoseEvent.status.in_([DoseStatus.TAKEN, DoseStatus.LATE]),
+                DoseEvent.responded_at >= window_start,
+            )
+            .first()
         )
-        .first()
-    )
-    if recent:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={
-                "error": "Conflict",
-                "detail": (
-                    f"Double-dose guard: a dose for this schedule was already confirmed within "
-                    f"the last {settings.DOUBLE_DOSE_GUARD_MINUTES} minutes. "
-                    "No dose logged and stock unchanged."
-                ),
-            },
-        )
+        if recent:
+            exc = HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "error": "Conflict",
+                    "detail": (
+                        f"Double-dose guard: a dose for this schedule was already confirmed within "
+                        f"the last {settings.DOUBLE_DOSE_GUARD_MINUTES} minutes. "
+                        "No dose logged and stock unchanged."
+                    ),
+                },
+            )
+            exc.code = "double_dose"
+            raise exc
 
     # Rule 4 — Past the late window
     late_cutoff = due_at + timedelta(minutes=settings.LATE_WINDOW_MINUTES)
     if now > late_cutoff:
         if not is_caregiver:
-            raise HTTPException(
+            exc = HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "error": "Conflict",
                     "detail": "Dose window closed, please contact your caregiver",
                 },
             )
+            exc.code = "window_closed"
+            raise exc
         # Caregiver acknowledges missed dose; status stays / becomes MISSED
         dose.status = DoseStatus.MISSED
         dose.responded_at = now

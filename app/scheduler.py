@@ -21,7 +21,7 @@ from app.services.escalation import process_tick
 from app.services.dose_engine import generate_dose_events
 from app.notifiers import get_notifier
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 scheduler: Optional[BackgroundScheduler] = None
 

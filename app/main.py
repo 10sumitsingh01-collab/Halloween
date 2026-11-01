@@ -12,7 +12,7 @@ from app.services.telegram_poller import start_poller, stop_poller
 import logging
 from app.config import settings
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 
 @asynccontextmanager

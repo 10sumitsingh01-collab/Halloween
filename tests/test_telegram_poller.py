@@ -30,8 +30,8 @@ from app.db import SessionLocal
 from app.models.patient import Patient
 from app.models.caregiver import Caregiver
 from app.models.medication import Medication, Schedule
-from app.models.dose import DoseEvent
-from app.models.enums import DoseStatus, DoseSource, NotifyLevel
+from app.models.dose import DoseEvent, EscalationLog
+from app.models.enums import DoseStatus, DoseSource, NotifyLevel, EscalationStatus
 from app.models.bot_state import BotState
 from app.services.telegram_poller import (
     handle_update,
@@ -460,3 +460,267 @@ class TestPollerLifecycleAndPrivacy:
         assert secret_token not in caplog.text
         # Verify 409 status code was logged cleanly
         assert "Telegram getUpdates returned status code 409" in caplog.text
+
+
+class TestDoubleDoseAndRegression:
+    """
+    Regression tests verifying:
+    a. Double-dose guard reply mapping and behavior when same chat is linked to patient & caregivers
+    b. DOUBLE_DOSE_GUARD_MINUTES=0 disables guard, confirms dose, decrements stock, sets acknowledged_at on tick
+    c. Unknown error code returns 'Something went wrong, please try again'
+    d. Replayed tap on taken dose returns 'Already recorded'
+    e. Handled update logging includes action, dose_id, outcome with strict privacy
+    f. Direct dose_engine test proving DOUBLE_DOSE_GUARD_MINUTES=0 disables guard
+    """
+
+    def _setup_shared_chat_scenario(self, db_session, chat_id="777888999", stock=30.0):
+        p, m, s, pending_dose = _setup_patient_and_dose(
+            db_session, chat_id=chat_id, due_at=FROZEN_NOW, stock=stock
+        )
+        # Link caregivers 1 and 2 to the EXACT SAME chat id
+        c1 = Caregiver(
+            name="Ramesh Kumar",
+            phone="+919876543211",
+            whatsapp_id="+919876543211",
+            relationship="son",
+            notify_level=NotifyLevel.ALL,
+            telegram_chat_id=chat_id,
+        )
+        c2 = Caregiver(
+            name="Sita Kumar",
+            phone="+919876543212",
+            whatsapp_id="+919876543212",
+            relationship="daughter",
+            notify_level=NotifyLevel.MISSED_ONLY,
+            telegram_chat_id=chat_id,
+        )
+        p.caregivers.extend([c1, c2])
+        db_session.add_all([c1, c2])
+        db_session.commit()
+        return p, m, s, pending_dose, c1, c2
+
+    def test_double_dose_guard_returns_new_fixed_reply_and_dose_stays_pending(self, db_session, monkeypatch):
+        chat_id = "777888999"
+        p, m, s, pending_dose, c1, c2 = self._setup_shared_chat_scenario(db_session, chat_id=chat_id, stock=30.0)
+
+        # Dose confirmed 5 minutes ago on the same schedule
+        prev_dose = DoseEvent(
+            schedule_id=s.id,
+            due_at=FROZEN_NOW - timedelta(minutes=10),
+            status=DoseStatus.TAKEN,
+            responded_at=FROZEN_NOW - timedelta(minutes=5),
+            source=DoseSource.PHONE,
+        )
+        db_session.add(prev_dose)
+        db_session.commit()
+
+        monkeypatch.setattr(settings, "DOUBLE_DOSE_GUARD_MINUTES", 30.0)
+
+        client = httpx.Client(
+            transport=httpx.MockTransport(lambda req: httpx.Response(200, json={"ok": True}))
+        )
+        update = _make_callback_update(pending_dose.id, action="taken", chat_id=chat_id)
+
+        outcome = handle_update(
+            db=db_session,
+            update=update,
+            http_client=client,
+            clock=lambda: FROZEN_NOW,
+            token=TEST_TOKEN,
+        )
+        expected_text = (
+            "Not recorded: a dose of this medicine was confirmed recently. "
+            "If you have not taken this one, please contact your caregiver."
+        )
+        assert outcome == expected_text
+
+        # Dose remains pending and stock is unchanged
+        db_session.refresh(pending_dose)
+        assert pending_dose.status == DoseStatus.PENDING
+        db_session.refresh(m)
+        assert m.stock_remaining == 30.0
+
+    def test_guard_zero_allows_confirmation_and_tick_acknowledges_log(self, db_session, monkeypatch):
+        chat_id = "777888999"
+        p, m, s, pending_dose, c1, c2 = self._setup_shared_chat_scenario(db_session, chat_id=chat_id, stock=30.0)
+
+        prev_dose = DoseEvent(
+            schedule_id=s.id,
+            due_at=FROZEN_NOW - timedelta(minutes=10),
+            status=DoseStatus.TAKEN,
+            responded_at=FROZEN_NOW - timedelta(minutes=5),
+            source=DoseSource.PHONE,
+        )
+        log = EscalationLog(
+            dose_event_id=pending_dose.id,
+            step="REMINDER_1",
+            recipient="patient",
+            channel="telegram",
+            sent_at=FROZEN_NOW,
+            status=EscalationStatus.SENT,
+            acknowledged_at=None,
+        )
+        db_session.add_all([prev_dose, log])
+        db_session.commit()
+
+        # Set guard to 0 (demo mode)
+        monkeypatch.setattr(settings, "DOUBLE_DOSE_GUARD_MINUTES", 0.0)
+
+        client = httpx.Client(
+            transport=httpx.MockTransport(lambda req: httpx.Response(200, json={"ok": True}))
+        )
+        update = _make_callback_update(pending_dose.id, action="taken", chat_id=chat_id)
+
+        outcome = handle_update(
+            db=db_session,
+            update=update,
+            http_client=client,
+            clock=lambda: FROZEN_NOW,
+            token=TEST_TOKEN,
+        )
+        assert outcome == "Marked as taken"
+
+        db_session.refresh(pending_dose)
+        assert pending_dose.status == DoseStatus.TAKEN
+        db_session.refresh(m)
+        assert m.stock_remaining == 29.0
+
+        # Run next tick: must NOT send caregiver escalation and MUST set acknowledged_at
+        from app.services.escalation import process_tick
+        from app.notifiers import get_notifier
+        tick_summary = process_tick(
+            db=db_session,
+            clock=lambda: FROZEN_NOW + timedelta(seconds=10),
+            notifier=get_notifier(),
+        )
+        assert tick_summary.get("sent", 0) == 0
+
+        db_session.refresh(log)
+        assert log.acknowledged_at is not None
+
+    def test_unknown_error_code_returns_generic_error(self, db_session, monkeypatch):
+        chat_id = "777888999"
+        p, m, s, pending_dose, c1, c2 = self._setup_shared_chat_scenario(db_session, chat_id=chat_id)
+
+        from fastapi import HTTPException
+        def fake_confirm(*args, **kwargs):
+            exc = HTTPException(status_code=400, detail="weird internal issue")
+            exc.code = "unrecognized_error_code_xyz"
+            raise exc
+
+        monkeypatch.setattr("app.services.dose_service.confirm_dose_taken", fake_confirm)
+
+        client = httpx.Client(
+            transport=httpx.MockTransport(lambda req: httpx.Response(200, json={"ok": True}))
+        )
+        update = _make_callback_update(pending_dose.id, action="taken", chat_id=chat_id)
+
+        outcome = handle_update(
+            db=db_session,
+            update=update,
+            http_client=client,
+            clock=lambda: FROZEN_NOW,
+            token=TEST_TOKEN,
+        )
+        assert outcome == "Something went wrong, please try again"
+
+    def test_replayed_tap_on_already_taken_dose_returns_already_recorded(self, db_session):
+        chat_id = "777888999"
+        p, m, s, dose, c1, c2 = self._setup_shared_chat_scenario(db_session, chat_id=chat_id, stock=25.0)
+
+        dose.status = DoseStatus.TAKEN
+        dose.responded_at = FROZEN_NOW - timedelta(minutes=2)
+        dose.source = DoseSource.PHONE
+        db_session.commit()
+
+        client = httpx.Client(
+            transport=httpx.MockTransport(lambda req: httpx.Response(200, json={"ok": True}))
+        )
+        update = _make_callback_update(dose.id, action="taken", chat_id=chat_id)
+
+        outcome = handle_update(
+            db=db_session,
+            update=update,
+            http_client=client,
+            clock=lambda: FROZEN_NOW,
+            token=TEST_TOKEN,
+        )
+        assert outcome == "Already recorded"
+        db_session.refresh(m)
+        assert m.stock_remaining == 25.0
+
+    def test_handled_update_logging_privacy(self, db_session, caplog):
+        caplog.set_level(logging.INFO)
+        chat_id = "987654321"
+        p, m, s, dose, c1, c2 = self._setup_shared_chat_scenario(db_session, chat_id=chat_id)
+
+        client = httpx.Client(
+            transport=httpx.MockTransport(lambda req: httpx.Response(200, json={"ok": True}))
+        )
+        update = _make_callback_update(dose.id, action="taken", chat_id=chat_id)
+
+        outcome = handle_update(
+            db=db_session,
+            update=update,
+            http_client=client,
+            clock=lambda: FROZEN_NOW,
+            token=TEST_TOKEN,
+        )
+        assert outcome == "Marked as taken"
+
+        # Log line format must match: "Handled update: action=taken, dose_id=..., outcome=marked_taken"
+        assert f"Handled update: action=taken, dose_id={dose.id}, outcome=marked_taken" in caplog.text
+        # Strict privacy: no chat id, callback text, or secrets
+        assert chat_id not in caplog.text
+        assert TEST_TOKEN not in caplog.text
+
+    def test_guard_zero_disables_double_dose_guard_in_dose_engine(self, db_session, monkeypatch):
+        p, m, s, dose1 = _setup_patient_and_dose(db_session, stock=10.0)
+
+        from app.services.dose_engine import confirm_taken
+        confirm_taken(
+            db=db_session,
+            dose_id=dose1.id,
+            source=DoseSource.PHONE,
+            is_caregiver=False,
+            clock=lambda: FROZEN_NOW,
+        )
+        db_session.refresh(dose1)
+        assert dose1.status == DoseStatus.TAKEN
+
+        dose2 = DoseEvent(
+            schedule_id=s.id,
+            due_at=FROZEN_NOW - timedelta(minutes=10),
+            status=DoseStatus.PENDING,
+        )
+        db_session.add(dose2)
+        db_session.commit()
+        db_session.refresh(dose2)
+
+        # With default 30m guard, confirming dose2 raises HTTPException with code="double_dose"
+        monkeypatch.setattr(settings, "DOUBLE_DOSE_GUARD_MINUTES", 30.0)
+        from fastapi import HTTPException
+        with pytest.raises(HTTPException) as exc_info:
+            confirm_taken(
+                db=db_session,
+                dose_id=dose2.id,
+                source=DoseSource.PHONE,
+                is_caregiver=False,
+                clock=lambda: FROZEN_NOW + timedelta(seconds=10),
+            )
+        assert exc_info.value.code == "double_dose"
+
+        # With guard set to 0, confirming dose2 succeeds without error
+        monkeypatch.setattr(settings, "DOUBLE_DOSE_GUARD_MINUTES", 0.0)
+        confirm_taken(
+            db=db_session,
+            dose_id=dose2.id,
+            source=DoseSource.PHONE,
+            is_caregiver=False,
+            clock=lambda: FROZEN_NOW + timedelta(seconds=10),
+        )
+        db_session.refresh(dose2)
+        assert dose2.status == DoseStatus.TAKEN
+        db_session.refresh(m)
+        assert m.stock_remaining == 8.0
+

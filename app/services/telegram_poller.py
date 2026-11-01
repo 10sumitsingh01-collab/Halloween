@@ -32,7 +32,7 @@ from app.models.patient import Patient
 from app.services.clock import utc_now
 from app.services import dose_service
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn.error")
 
 # Suppress httpx and httpcore loggers to prevent leaking URLs with tokens
 logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -193,6 +193,7 @@ def handle_update(
     dose = db.get(DoseEvent, dose_id)
     if not dose:
         outcome = "Dose not found"
+        logger.info("Handled update: action=%s, dose_id=%d, outcome=dose_not_found", action, dose_id)
         if query_id:
             _post_answer_callback(http_client, token, query_id, outcome)
         return outcome
@@ -207,6 +208,7 @@ def handle_update(
         return None
 
     outcome = "Something went wrong, please try again"
+    outcome_code = "unexpected_error"
 
     if action == "taken":
         try:
@@ -218,23 +220,30 @@ def handle_update(
                 clock=clock,
             )
             outcome = "Marked as taken"
+            outcome_code = "marked_taken"
         except HTTPException as exc:
-            detail_str = ""
-            if isinstance(exc.detail, dict):
-                detail_str = str(exc.detail.get("detail", ""))
-            else:
-                detail_str = str(exc.detail)
-
-            if "Too early" in detail_str:
+            code = getattr(exc, "code", None)
+            if code == "too_early":
                 outcome = "Too early"
-            elif "closed" in detail_str.lower():
+                outcome_code = "too_early"
+            elif code == "window_closed":
                 outcome = "Window closed, please contact your caregiver"
-            elif "already" in detail_str.lower() or "double-dose" in detail_str.lower():
+                outcome_code = "window_closed"
+            elif code == "double_dose":
+                outcome = (
+                    "Not recorded: a dose of this medicine was confirmed recently. "
+                    "If you have not taken this one, please contact your caregiver."
+                )
+                outcome_code = "double_dose"
+            elif code == "already_recorded":
                 outcome = "Already recorded"
+                outcome_code = "already_recorded"
             else:
-                outcome = "Already recorded"
+                outcome = "Something went wrong, please try again"
+                outcome_code = "unknown_error"
         except Exception:
             outcome = "Something went wrong, please try again"
+            outcome_code = "unexpected_error"
 
     elif action == "snooze":
         try:
@@ -245,19 +254,20 @@ def handle_update(
                 clock=clock,
             )
             outcome = "Snoozed 10 minutes"
+            outcome_code = "snoozed_10m"
         except HTTPException as exc:
-            detail_str = ""
-            if isinstance(exc.detail, dict):
-                detail_str = str(exc.detail.get("detail", ""))
-            else:
-                detail_str = str(exc.detail)
-
-            if "not found" in detail_str.lower():
+            code = getattr(exc, "code", None)
+            if code == "not_found":
                 outcome = "Dose not found"
+                outcome_code = "dose_not_found"
             else:
                 outcome = "Something went wrong, please try again"
+                outcome_code = "unknown_error"
         except Exception:
             outcome = "Something went wrong, please try again"
+            outcome_code = "unexpected_error"
+
+    logger.info("Handled update: action=%s, dose_id=%d, outcome=%s", action, dose_id, outcome_code)
 
     # Answer callback query popup
     if query_id:

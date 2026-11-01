@@ -120,10 +120,12 @@ def snooze_dose(
 ) -> Dict[str, Any]:
     dose = db.query(DoseEvent).filter(DoseEvent.id == dose_id).first()
     if not dose:
-        raise HTTPException(
+        exc = HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": "Not Found", "detail": f"DoseEvent with id {dose_id} not found"},
         )
+        exc.code = "not_found"
+        raise exc
 
     snooze_until = ensure_utc(clock()) + timedelta(minutes=minutes)
     dose.snoozed_until = snooze_until

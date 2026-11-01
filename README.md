@@ -283,66 +283,56 @@ curl -X POST "http://localhost:8000/api/v1/doses/1/snooze" \
 
 MedMate supports rapid live demonstration using fractional minutes for timing windows and the background APScheduler.
 
-### 1. Set Demo Timing Windows in `.env`
-Update `.env` with small fractional intervals:
-```env
-# Demo timing windows (in minutes / seconds)
-TAKEN_WINDOW_MINUTES=0.5
-LATE_WINDOW_MINUTES=3.0
-REMINDER_REPEAT_MINUTES=0.5
-CAREGIVER_ESCALATION_MINUTES=1.5
-SCHEDULER_TICK_SECONDS=5.0
-SCHEDULER_ENABLED=true
+### Command-Line Demo Overrides (Without Touching `.env`)
+Rather than modifying `.env`, pass timing window and poller overrides directly on the command line:
+```bash
+NOTIFIER_CHANNEL=telegram TELEGRAM_POLL_ENABLED=true SCHEDULER_ENABLED=true \
+TAKEN_WINDOW_MINUTES=0.5 LATE_WINDOW_MINUTES=3.0 REMINDER_REPEAT_MINUTES=0.5 \
+CAREGIVER_ESCALATION_MINUTES=1.5 SCHEDULER_TICK_SECONDS=5.0 DOUBLE_DOSE_GUARD_MINUTES=0 \
+./.venv/bin/uvicorn app.main:app --workers 1
 ```
 
-### 2. Run the FastAPI Server
-Start Uvicorn with a single worker and **NO `--reload`** (process reloading restarts background workers and confuses the scheduler):
-```bash
-uvicorn app.main:app --workers 1
-```
-*Note: On startup, the scheduler logs enabled status, tick interval, and active notifier channel (`mock`).*
+> **Why `DOUBLE_DOSE_GUARD_MINUTES=0` for Demos?**
+> In production, MedMate's Layer 3 clinical safety rules enforce `DOUBLE_DOSE_GUARD_MINUTES=30` by default. If a patient confirms a dose, any subsequent confirmation for the same medication within 30 minutes is safely rejected with:
+> *"Not recorded: a dose of this medicine was confirmed recently. If you have not taken this one, please contact your caregiver."*
+> Setting `DOUBLE_DOSE_GUARD_MINUTES=0` on the CLI explicitly disables the guard so back-to-back demo doses (such as demo Metformin doses created minutes apart) can be confirmed and decremented without waiting 30 minutes.
 
-### 3. Create a Demo Dose
-In a separate terminal, schedule a dose for the seed patient ("Lakshmi Devi") to become due in 20 seconds:
+### 2. Create a Demo Dose
+In a separate terminal, schedule a dose for the seed patient ("Lakshmi Devi") to become due in 30 seconds:
 ```bash
-python scripts/demo_dose.py --seconds 20
+python scripts/demo_dose.py --seconds 30
 ```
 This prints the created `DoseEvent` ID (e.g., `4`).
 
-### 4. Observe Escalations in Real-Time
+### 3. Observe Escalations in Real-Time
 Poll the dose's escalation timeline using the caregiver API key:
 ```bash
 curl -s -H "X-API-Key: test_caregiver_key_123" http://localhost:8000/api/v1/doses/<DOSE_ID>/escalations | jq
 ```
 
 ### Expected Timeline of Events
-- **T+0s**: Dose created with status `pending`, due at `T+20s`.
-- **T+20s**: Dose becomes due. Scheduler tick fires -> `REMINDER_1` is sent to patient (`whatsapp:+910000000000`).
-- **T+50s** (+0.5 min): Patient has not responded -> `REMINDER_2` is sent.
-- **T+110s** (+1.5 min from due): Unconfirmed threshold reached -> `CAREGIVER_UNCONFIRMED` alert is sent to caregiver Ramesh Kumar.
-- **T+200s** (+3.0 min from due): Late window expires -> dose is marked `missed` -> `MISSED_ALERT` is sent to caregivers.
-
-### Stopping Escalation via Patient Confirmation
-At any time before the dose becomes missed, the patient can confirm taking the medication:
-```bash
-curl -X POST -H "X-API-Key: test_patient_key_456" http://localhost:8000/api/v1/doses/<DOSE_ID>/taken
-```
-This updates the dose status to `taken` (or `late`), stopping further escalation and acknowledging open logs.
+- **T+0s**: Dose created with status `pending`, due at `T+30s`.
+- **T+30s**: Dose becomes due. Scheduler tick fires -> `REMINDER_1` is sent to patient with inline buttons `[Taken]` and `[Snooze 10 min]`.
+- **T+60s** (+0.5 min): Patient has not responded -> `REMINDER_2` repeat is sent with buttons.
+- **T+120s** (+1.5 min from due): Unconfirmed threshold reached -> `CAREGIVER_UNCONFIRMED` plain text alert is sent to caregiver Ramesh Kumar.
+- **T+210s** (+3.0 min from due): Late window expires -> dose is marked `missed` -> `MISSED_ALERT` is sent to caregivers.
 
 ---
 
 ## Telegram Setup & Account Linking
 
-To link Telegram accounts for real notifications, configure your bot token in `.env`:
-```env
-NOTIFIER_CHANNEL=telegram
-TELEGRAM_BOT_TOKEN=<your_telegram_bot_token>
-TELEGRAM_POLL_ENABLED=true
-```
+To link Telegram accounts for real notifications and interactive button replies:
 
-### Linking Patient and Caregiver Chat IDs
+### 1. Configure Bot Token in `.env`
+Add your Telegram bot token to `.env` (this token is stored securely as a `SecretStr` and never committed or printed in logs):
+```env
+TELEGRAM_BOT_TOKEN=<your_telegram_bot_token>
+```
+Keep `NOTIFIER_CHANNEL=mock` in `.env` so unit test suites continue running safely in mock mode. Use CLI overrides when running live demonstrations.
+
+### 2. Linking Patient and Caregiver Chat IDs
 Use `scripts/link_telegram.py` to link chat IDs directly in the database.
-> **Note**: `scripts/link_telegram.py` should be run with the application server stopped. It reads `DATABASE_URL` directly from settings without hardcoded paths.
+> **Note**: Always stop the application server before running scripts that access the database directly.
 
 ```bash
 # Link by explicit Telegram chat ID (chat ID is masked in console output)
@@ -354,10 +344,23 @@ python scripts/link_telegram.py --patient 1 --from-latest
 python scripts/link_telegram.py --caregiver 2 --from-latest
 ```
 
-To test message delivery to a patient:
+### 3. Testing Message Delivery
+Test outbound messaging to a patient's device:
 ```bash
 python scripts/telegram_test.py --patient 1
 ```
+
+### 4. Long Polling & Interactive Button Outcomes
+When `TELEGRAM_POLL_ENABLED=true` and `NOTIFIER_CHANNEL=telegram`, the application starts a background `TelegramPoller` daemon thread that long-polls Telegram's `getUpdates` endpoint.
+- **`[Taken]` Callback**: Validates patient chat ownership, confirms dose via `DoseSource.PHONE`, decrements stock, acknowledges escalation logs, removes inline buttons from the Telegram message, and displays the outcome:
+  - *"Marked as taken"* (within taken window)
+  - *"Already recorded"* (if tapped again)
+  - *"Not recorded: a dose of this medicine was confirmed recently..."* (if double-dose guard triggered)
+  - *"Too early"* (if confirmed before early window)
+  - *"Window closed, please contact your caregiver"* (if confirmed after late window)
+- **`[Snooze 10 min]` Callback**: Updates `snoozed_until = now + 10m` and responds with *"Snoozed 10 minutes"*.
+- **Concurrency & Resilience**: SQLite connection uses a 30-second busy timeout (`PRAGMA busy_timeout=30000`) ensuring seamless concurrent writes between the scheduler and poller threads.
+- **Strict Privacy**: Poller logs emit only fixed status codes and actions (`action=taken dose_id=... outcome=...`). No tokens, full chat IDs, callback text, or exception strings are ever printed or logged.
 
 ---
 ```text
