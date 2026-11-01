@@ -363,6 +363,7 @@ When `TELEGRAM_POLL_ENABLED=true` and `NOTIFIER_CHANNEL=telegram`, the applicati
 - **Strict Privacy**: Poller logs emit only fixed status codes and actions (`action=taken dose_id=... outcome=...`). No tokens, full chat IDs, callback text, or exception strings are ever printed or logged.
 
 ---
+
 ```text
 medmate/
 ├── .env.example
@@ -373,23 +374,33 @@ medmate/
 │   ├── env.py
 │   └── versions/
 │       ├── fb162d807d6d_0001_initial_schema.py
-│       └── b445df0e1011_0002_dose_unique_constraint.py
+│       ├── b445df0e1011_0002_dose_unique_constraint.py
+│       ├── 8d394e2fc10a_0003_escalation_logs.py
+│       ├── c3b5e8210941_0004_dose_snooze.py
+│       ├── 7d25e019f3b2_0005_escalation_status_and_attempt.py
+│       ├── 3c8e42918bb1_0006_telegram_chat_id.py
+│       └── a92d847192bf_0007_bot_state.py
 ├── scripts/
 │   ├── __init__.py
-│   └── seed.py
+│   ├── seed.py
+│   ├── demo_dose.py
+│   ├── link_telegram.py
+│   └── telegram_test.py
 ├── app/
 │   ├── __init__.py
 │   ├── main.py
 │   ├── config.py
 │   ├── db.py
 │   ├── auth.py
+│   ├── scheduler.py
 │   ├── models/
 │   │   ├── __init__.py
 │   │   ├── enums.py
 │   │   ├── patient.py
 │   │   ├── caregiver.py
 │   │   ├── medication.py
-│   │   └── dose.py
+│   │   ├── dose.py
+│   │   └── bot_state.py
 │   ├── schemas/
 │   │   ├── __init__.py
 │   │   ├── common.py
@@ -404,7 +415,11 @@ medmate/
 │   │   ├── patient_service.py
 │   │   ├── caregiver_service.py
 │   │   ├── medication_service.py
-│   │   └── dose_service.py
+│   │   ├── dose_service.py
+│   │   ├── notifier.py
+│   │   ├── escalation_engine.py
+│   │   ├── telegram_client.py
+│   │   └── telegram_poller.py
 │   └── routers/
 │       ├── __init__.py
 │       ├── admin.py
@@ -420,5 +435,11 @@ medmate/
     ├── test_endpoints.py
     ├── test_doses.py
     ├── test_models.py
-    └── test_seed.py
+    ├── test_seed.py
+    ├── test_escalation.py
+    ├── test_escalation_api.py
+    ├── test_scheduler.py
+    ├── test_snooze_and_notifiers.py
+    ├── test_telegram_notifier.py
+    └── test_telegram_poller.py
 ```
