@@ -28,7 +28,7 @@ def db_session():
     """In-memory SQLite database session for isolated testing."""
     engine = create_engine(
         "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
+        connect_args={"check_same_thread": False, "timeout": 30.0},
         poolclass=StaticPool,
     )
 
@@ -36,6 +36,7 @@ def db_session():
     def set_sqlite_pragma(dbapi_connection, connection_record):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA busy_timeout=30000")
         cursor.close()
 
     Base.metadata.create_all(bind=engine)

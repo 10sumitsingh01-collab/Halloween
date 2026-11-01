@@ -6,6 +6,7 @@ from fastapi.exceptions import RequestValidationError
 
 from app.routers import patients, caregivers, medications, doses, admin
 from app.scheduler import start_scheduler, stop_scheduler
+from app.services.telegram_poller import start_poller, stop_poller
 
 
 import logging
@@ -28,8 +29,11 @@ async def lifespan(app: FastAPI):
 
     # Start background scheduler if enabled
     start_scheduler()
+    # Start Telegram poller if enabled
+    start_poller()
     yield
-    # Shutdown: gracefully stop background scheduler
+    # Shutdown: gracefully stop background services
+    stop_poller()
     stop_scheduler()
 
 
