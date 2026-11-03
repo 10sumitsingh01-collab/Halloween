@@ -55,11 +55,11 @@ A critical architectural distinction must be noted:
 - **Telegram Inline Buttons:** These are proprietary UI elements rendered exclusively within the Telegram client app window. They communicate directly with Telegram's cloud servers via Telegram MTProto/HTTPS. They are **not** Android OS notification action buttons.
 - **Android Notification Actions:** These are native OS objects (`NotificationCompat.Action`) attached to the Android system notification drawer. They trigger a local Android `BroadcastReceiver`, `Service`, or `PendingIntent`.
 - **Why the Watch Currently Cannot Act on Telegram Reminders:**
-  When Telegram displays a notification on the phone, the Fire-Boltt companion app intercepts the Android status bar notification text (title and message body) via Android's `NotificationListenerService` and relays the text bytes over Bluetooth Low Energy (BLE) to the watch. Because Telegram does not expose its proprietary in-chat inline keyboard buttons as Android notification actions, and because the watch's proprietary firmware cannot render interactive Telegram inline keyboards, the watch only displays static text.
+  When Telegram displays a notification on the phone, the Da Fit app intercepts the Android status bar notification text (title and message body) via Android's `NotificationListenerService` and relays the text bytes over Bluetooth Low Energy (BLE) to the watch. Because Telegram does not expose its proprietary in-chat inline keyboard buttons as Android notification actions, and because the watch's proprietary firmware cannot render interactive Telegram inline keyboards, the watch only displays static text.
 
 ---
 
-## 3. Hardware & Companion App Reality (Fire-Boltt BSW052)
+## 3. Hardware & Companion App Reality (Fire-Boltt BSW052 via Da Fit)
 
 ### 3.1 Confirmed Evidence
 - The watch vibrates/buzzes upon receiving incoming notifications mirrored from the phone.
@@ -67,13 +67,13 @@ A critical architectural distinction must be noted:
 - To take action, the user must physically access their smartphone.
 
 ### 3.2 Technical Architecture of the BSW052
-The Fire-Boltt BSW052 is a budget smartwatch running a lightweight proprietary Real-Time Operating System (RTOS) (typically based on Realtek/Goodix/Actions microcontrollers), paired via a companion app (such as Da Fit or Fire-Boltt).
+The Fire-Boltt BSW052 is a budget smartwatch running a lightweight proprietary Real-Time Operating System (RTOS) (typically based on Realtek/Goodix/Actions microcontrollers), paired exclusively via the Da Fit companion app.
 - **Not WearOS:** Unlike Google WearOS or Apple watchOS, the BSW052 does not run a third-party application runtime, does not support custom watch APKs, and does not support standard Android Wear notification action extensions.
-- **Companion App Gateway:** All data transferred between phone and watch passes through the proprietary companion app via vendor-specific BLE GATT profiles.
+- **Companion App Gateway:** All data transferred between phone and watch passes through the Da Fit app via vendor-specific BLE GATT profiles.
 - **Bluetooth Calling Capability:** The BSW052 supports Bluetooth calling (Dual Bluetooth / HFP - Hands-Free Profile). It contains an integrated wrist speaker and microphone, and registers with Android as a Bluetooth hands-free audio device.
 
 ### 3.3 What Remains Unknown
-1. Does the companion app parse native Android `NotificationCompat.Action` buttons and transmit action triggers back to the phone when pressed on the watch? (Most RTOS companion apps only mirror text and discard action buttons).
+1. Does the Da Fit app parse native Android `NotificationCompat.Action` buttons and transmit action triggers back to the phone when pressed on the watch? (Most RTOS companion apps only mirror text and discard action buttons).
 2. Does the watch firmware expose interactive action buttons for third-party notifications, or only a single "Dismiss/Clear" button?
 3. Can an incoming self-managed Android Telecom phone call trigger the watch's native incoming call screen with interactive "Answer / Reject" buttons?
 4. If an alarm with Text-to-Speech audio is routed to the Bluetooth SCO/hands-free channel, does the watch wrist speaker output the audio clearly?
@@ -91,7 +91,7 @@ To answer these unknowns empirically without resorting to reverse-engineering pr
 |                                                                                   |
 |  [Probe 1: Notification Actions]                                                 |
 |    - System notification with explicit Taken (TEST) and Snooze 10 min (TEST)     |
-|    - Tests: Does companion app mirror actions? Can watch invoke PendingIntent?    |
+|    - Tests: Does Da Fit mirror actions? Can watch invoke PendingIntent?          |
 |                                                                                   |
 |  [Probe 2: Telecom Calling (HFP)]                                                 |
 |    - Self-managed PhoneAccount & ConnectionService                                |
@@ -200,3 +200,4 @@ When Phase C is authorized, the Android-to-backend bridge must adhere to the fol
 1. **Risk of Silent Notification Action Dropping:** Most budget RTOS companion apps silently strip notification actions. Probe 1 will decisively verify if this limitation applies.
 2. **Bluetooth Connection State Flakiness:** If the watch's secondary Bluetooth audio channel enters sleep mode, incoming call HFP signals may experience delay.
 3. **Zero Production Mutation:** All probes operate in isolated test mode. No production patient schedules or dose records can be modified by the compatibility test app.
+
