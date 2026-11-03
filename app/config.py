@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: Optional[SecretStr] = None
     TELEGRAM_POLL_ENABLED: bool = True
 
+    # Assistant (Layer 7)
+    ASSISTANT_API_KEY: Optional[SecretStr] = None
+    ASSISTANT_PATIENT_ID: Optional[int] = None
+    ALERT_COOLDOWN_MINUTES: float = 10.0
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

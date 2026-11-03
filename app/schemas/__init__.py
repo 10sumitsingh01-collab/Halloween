@@ -5,6 +5,9 @@ from app.schemas.patient import (
     PatientNoteCreate,
     PatientNoteResponse,
     AdherenceResponse,
+    AlertCategory,
+    AssistantAlertRequest,
+    AssistantAlertResponse,
 )
 from app.schemas.caregiver import CaregiverCreate, CaregiverResponse
 from app.schemas.medication import (
@@ -47,4 +50,7 @@ __all__ = [
     "GenerateDosesResponse",
     "MarkMissedResponse",
     "RefillResponse",
+    "AlertCategory",
+    "AssistantAlertRequest",
+    "AssistantAlertResponse",
 ]

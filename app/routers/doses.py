@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.auth import require_any_key, is_caregiver_key
+from app.auth import require_any_key, require_assistant_or_patient_key, is_caregiver_key
 from app.models.dose import DoseEvent, EscalationLog
 from app.schemas.dose import (
     DoseTodayResponse,
@@ -29,7 +29,7 @@ router = APIRouter(tags=["doses"])
 def get_today_doses(
     id: int,
     db: Session = Depends(get_db),
-    _auth: str = Depends(require_any_key),
+    _auth: str = Depends(require_assistant_or_patient_key),
     clock: Callable[[], datetime] = Depends(get_clock),
 ):
     return dose_service.get_today_doses(db, id, clock)
@@ -44,7 +44,7 @@ def mark_dose_taken(
     id: int,
     request: DoseTakenRequest = DoseTakenRequest(),
     db: Session = Depends(get_db),
-    api_key: str = Depends(require_any_key),
+    api_key: str = Depends(require_assistant_or_patient_key),
     clock: Callable[[], datetime] = Depends(get_clock),
 ):
     return dose_service.confirm_dose_taken(
@@ -79,7 +79,7 @@ def snooze_dose(
     id: int,
     request: DoseSnoozeRequest = DoseSnoozeRequest(),
     db: Session = Depends(get_db),
-    _auth: str = Depends(require_any_key),
+    _auth: str = Depends(require_assistant_or_patient_key),
     clock: Callable[[], datetime] = Depends(get_clock),
 ):
     return dose_service.snooze_dose(db, id, request.minutes, clock)

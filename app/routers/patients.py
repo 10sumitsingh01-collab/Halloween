@@ -5,16 +5,19 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.auth import require_caregiver_key, require_any_key
+from app.auth import require_caregiver_key, require_any_key, require_assistant_or_patient_key
+from app.notifiers import BaseNotifier, get_notifier
 from app.schemas.patient import (
     PatientCreate,
     PatientResponse,
     PatientNoteCreate,
     PatientNoteResponse,
     AdherenceResponse,
+    AssistantAlertRequest,
+    AssistantAlertResponse,
 )
 from app.schemas.medication import RefillResponse, MedicationResponse
-from app.services import patient_service
+from app.services import patient_service, alert_service
 from app.services import dose_engine
 from app.services.clock import get_clock
 
@@ -71,7 +74,7 @@ def create_note(
     id: int,
     note_in: PatientNoteCreate,
     db: Session = Depends(get_db),
-    _auth: str = Depends(require_any_key),
+    _auth: str = Depends(require_assistant_or_patient_key),
     clock: Callable[[], datetime] = Depends(get_clock),
 ):
     return patient_service.create_patient_note(db, id, note_in, clock)
@@ -86,10 +89,33 @@ def get_adherence(
     id: int,
     days: int = Query(default=7, ge=1),
     db: Session = Depends(get_db),
-    _auth: str = Depends(require_any_key),
+    _auth: str = Depends(require_assistant_or_patient_key),
     clock: Callable[[], datetime] = Depends(get_clock),
 ):
     return patient_service.calculate_patient_adherence(db, id, days, clock)
+
+
+@router.post(
+    "/patients/{id}/assistant/alerts",
+    response_model=AssistantAlertResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Trigger caregiver alert from patient assistant",
+)
+def create_assistant_alert(
+    id: int,
+    alert_in: AssistantAlertRequest,
+    db: Session = Depends(get_db),
+    _auth: str = Depends(require_assistant_or_patient_key),
+    clock: Callable[[], datetime] = Depends(get_clock),
+    notifier: BaseNotifier = Depends(get_notifier),
+):
+    return alert_service.process_assistant_alert(
+        db=db,
+        patient_id=id,
+        alert_in=alert_in,
+        notifier=notifier,
+        clock=clock,
+    )
 
 
 @router.get(

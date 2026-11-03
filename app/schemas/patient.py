@@ -1,7 +1,25 @@
+import enum
 from datetime import time, datetime
 from typing import Dict, Optional
 from pydantic import BaseModel, ConfigDict, Field
 from app.models.enums import NoteKind
+
+
+class AlertCategory(str, enum.Enum):
+    SYMPTOM = "symptom"
+    NEEDS_HELP = "needs_help"
+    EMERGENCY = "emergency"
+
+
+class AssistantAlertRequest(BaseModel):
+    category: AlertCategory
+    note: Optional[str] = Field(default=None, max_length=300)
+
+
+class AssistantAlertResponse(BaseModel):
+    sent: bool
+    caregivers_notified: int
+    patient_message: str
 
 
 class PatientCreate(BaseModel):

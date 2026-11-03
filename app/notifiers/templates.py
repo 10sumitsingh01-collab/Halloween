@@ -5,7 +5,7 @@ Deterministic, fixed message templates for patient reminders and caregiver alert
 All timestamps are rendered in the patient's configured timezone.
 No advice, no diagnosis, no LLM calls.
 """
-from datetime import timezone
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.models.patient import Patient
 from app.models.dose import DoseEvent
@@ -75,3 +75,22 @@ def format_caregiver_missed_alert(patient: Patient, dose_event: DoseEvent) -> st
         f"Caregiver Alert: Dose missed. {patient.name} did not take their {due_str} "
         f"dose of {med.name} ({med.strength})."
     )
+
+
+def format_caregiver_assistant_alert(
+    patient: Patient,
+    category: str,
+    report_time: datetime,
+) -> str:
+    """
+    Caregiver alert triggered by patient via assistant key:
+      Includes patient name, category, and report time in patient's timezone.
+      Never includes note text or model-written text.
+    """
+    tz = _get_patient_tz(patient)
+    time_str = _format_due_time(report_time, tz)
+    return (
+        f"MedMate alert: {patient.name} says they need help "
+        f"({category} reported at {time_str}). Please check on them."
+    )
+

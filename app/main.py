@@ -10,6 +10,7 @@ from app.services.telegram_poller import start_poller, stop_poller
 
 
 import logging
+import secrets
 from app.config import settings
 
 logger = logging.getLogger("uvicorn.error")
@@ -17,6 +18,13 @@ logger = logging.getLogger("uvicorn.error")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Startup validation: assistant key must not match caregiver or patient key
+    if settings.ASSISTANT_API_KEY:
+        assistant_val = settings.ASSISTANT_API_KEY.get_secret_value()
+        if assistant_val:
+            if secrets.compare_digest(assistant_val, settings.CAREGIVER_API_KEY) or secrets.compare_digest(assistant_val, settings.PATIENT_API_KEY):
+                raise RuntimeError("ASSISTANT_API_KEY must not match CAREGIVER_API_KEY or PATIENT_API_KEY")
+
     # Startup: validate notifier channel & token, fail fast if missing
     channel = getattr(settings, "NOTIFIER_CHANNEL", "mock").lower()
     if channel == "telegram":

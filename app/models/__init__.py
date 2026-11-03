@@ -4,6 +4,7 @@ from app.models.caregiver import Caregiver
 from app.models.medication import Medication, Schedule
 from app.models.dose import DoseEvent, EscalationLog
 from app.models.bot_state import BotState
+from app.models.alert import AlertLog
 
 __all__ = [
     "NotifyLevel",
@@ -20,4 +21,5 @@ __all__ = [
     "DoseEvent",
     "EscalationLog",
     "BotState",
+    "AlertLog",
 ]
