@@ -43,3 +43,13 @@ htmlcov/
 build/
 dist/
 *.egg-info/
+
+# Android build outputs & Signing
+.gradle/
+local.properties
+*.apk
+*.aab
+*.ap_
+*.dex
+*.jks
+*.keystore
