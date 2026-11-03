@@ -135,13 +135,33 @@ To answer these unknowns empirically without resorting to reverse-engineering pr
 
 ## 5. Phase B Manual Test Protocol
 
-### 5.1 Pre-Test Setup
-1. Ensure the Fire-Boltt BSW052 is paired and connected to the smartphone via the official companion app (e.g., Da Fit or Fire-Boltt app).
-2. Confirm Bluetooth Call audio is paired and connected in Android Bluetooth settings (BSW052_Phone / Call audio profile active).
-3. Confirm that notification access permissions and battery optimization exemptions are granted to the companion app.
-4. Install and launch the `medmate-watch-test` APK on the phone.
+### 5.1 Da Fit Pre-Test Checklist & Setup
+1. **Open Da Fit app on phone**: Navigate to the **Device** tab.
+2. **Notification Access**: Go to **Notifications** > Turn ON **"Other apps"** (or find **"MedMate Watch Test"** in the app list and turn it ON).
+3. **BLE Connection**: Ensure phone is connected to the Fire-Boltt BSW052 via Bluetooth Low Energy (BLE) inside Da Fit.
+4. **Bluetooth Call / Audio Connection (Probes 2 & 3)**:
+   - Ensure the watch is also connected as a Bluetooth phone / audio device in Android's system Bluetooth settings.
+   - *Note:* The Fire-Boltt BSW052 uses dual Bluetooth: one BLE link for Da Fit fitness/notification syncing, and one classic Bluetooth HFP/A2DP link (e.g. "BSW052_Phone") for phone calls and speaker audio.
+5. **Battery Optimization**: Ensure Da Fit has background autostart and battery optimization disabled in Android settings so notifications are not dropped.
 
-### 5.2 Test Execution Steps
+### 5.2 Build & Install Instructions
+To build and install the test APK from source:
+```bash
+# Set Java 17 and toolchain paths
+export JAVA_HOME="/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
+export ANDROID_HOME="/opt/homebrew/share/android-commandlinetools"
+export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
+
+# Build debug APK
+cd medmate-watch-test
+./gradlew assembleDebug
+
+# Install and launch on phone via ADB
+adb install -r app/build/outputs/apk/debug/app-debug.apk
+adb shell am start -n com.medmate.watchtest/.MainActivity
+```
+
+### 5.3 Test Execution Steps
 - **Test Run 1: Notification Actions**
   1. Tap `Post Test Notification`.
   2. Observe watch display and vibration.
@@ -166,19 +186,20 @@ To answer these unknowns empirically without resorting to reverse-engineering pr
 
 ## 6. Manual Test Results Table
 
-*(The tester should complete this table following physical verification with the Fire-Boltt BSW052)*
+*(The tester should complete this table following physical verification with the Fire-Boltt BSW052. Leave companion app version blank until testing)*
 
 | Probe | Watch Buzzed or Rang? | Text / Caller Name Shown on Watch? | Action or Answer/Reject Possible on Watch? | Action Actually Recorded by Android App? | Audio Audible from Watch Speaker? | Android Version | Companion App Name & Version | Notes |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Probe 1: Notification Actions** | | | | | N/A | | | |
-| **Probe 2: Telecom Incoming Call** | | | | | | | | |
-| **Probe 3: Alarm & TTS Audio** | | | N/A | N/A | | | | |
+| **Probe 1: Notification Actions** | | | | | N/A | | Da Fit (v: ) | |
+| **Probe 2: Telecom Incoming Call** | | | | | | | Da Fit (v: ) | |
+| **Probe 3: Alarm & TTS Audio** | | | N/A | N/A | | | Da Fit (v: ) | |
 
 ---
 
 ## 7. Phase C Bridge Architecture Specification (Documented for Future Implementation)
 
-*Note: Phase C implementation is deferred until physical watch action capabilities are proven.*
+> [!IMPORTANT]
+> **Phase C Deferred:** The backend bridge in Phase C will be designed and implemented **only after** the manual test results in Section 6 are filled in and physical watch capabilities are confirmed. No Phase C code or backend modifications are performed in this phase.
 
 When Phase C is authorized, the Android-to-backend bridge must adhere to the following architecture:
 1. **Limited Device Token:** The Android test app must authenticate using a dedicated, scoped assistant token (`ASSISTANT_API_KEY`) bound strictly to a dedicated test patient ID (`ASSISTANT_PATIENT_ID`).

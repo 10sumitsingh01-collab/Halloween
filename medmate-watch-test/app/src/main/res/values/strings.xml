@@ -1,0 +1,29 @@
+<resources>
+    <string name="app_name">MedMate Watch Test</string>
+    <string name="title">MedMate Watch Action Test</string>
+    <string name="subtitle">TEST ONLY - Not connected to backend</string>
+    
+    <!-- Probe 1 -->
+    <string name="probe1_title">Probe 1: Notification Actions</string>
+    <string name="probe1_desc">Posts a notification with [Taken (TEST)] and [Snooze 10 min (TEST)] action buttons.</string>
+    <string name="probe1_button">Fire Test Notification</string>
+    
+    <!-- Probe 2 -->
+    <string name="probe2_title">Probe 2: Telecom Calling (HFP)</string>
+    <string name="probe2_desc">Raises a self-managed incoming call from \'MedMate TEST: Metformin 500 mg\'. Answers, rejects, and 60s timeout are logged.</string>
+    <string name="probe2_button">Simulate Incoming Call</string>
+    
+    <!-- Probe 3 -->
+    <string name="probe3_title">Probe 3: Alarm &amp; Audio Routing</string>
+    <string name="probe3_desc">Plays looping alarm and repeats TTS \'Time to take Metformin, 500 milligram, after breakfast\' every 20 seconds until stopped.</string>
+    <string name="probe3_route_speaker">Phone Speaker</string>
+    <string name="probe3_route_bluetooth">Bluetooth Hands-Free (SCO)</string>
+    <string name="probe3_start">Start Alarm Probe</string>
+    <string name="probe3_stop">Stop Alarm Probe</string>
+    
+    <!-- Log actions -->
+    <string name="log_title">Event Log (Real-Time)</string>
+    <string name="clear_log">Clear Log</string>
+    <string name="copy_log">Copy Log</string>
+</resources>
+

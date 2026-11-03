@@ -1,0 +1,18 @@
+<resources>
+    <color name="primary">#1E3A8A</color>
+    <color name="primary_dark">#0F172A</color>
+    <color name="accent">#2563EB</color>
+    <color name="background">#F8FAFC</color>
+    <color name="card_bg">#FFFFFF</color>
+    <color name="card_border">#E2E8F0</color>
+    <color name="text_primary">#0F172A</color>
+    <color name="text_secondary">#475569</color>
+    <color name="warning_bg">#FEF3C7</color>
+    <color name="warning_text">#92400E</color>
+    <color name="warning_border">#F59E0B</color>
+    <color name="log_bg">#0F172A</color>
+    <color name="log_text">#10B981</color>
+    <color name="status_green">#16A34A</color>
+    <color name="status_red">#DC2626</color>
+</resources>
+
