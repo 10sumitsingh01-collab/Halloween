@@ -186,13 +186,18 @@ adb shell am start -n com.medmate.watchtest/.MainActivity
 
 ## 6. Manual Test Results Table
 
-*(The tester should complete this table following physical verification with the Fire-Boltt BSW052. Leave companion app version blank until testing)*
+*(Physical verification conducted on Fire-Boltt BSW052; results below observed by the user)*
 
-| Probe | Watch Buzzed or Rang? | Text / Caller Name Shown on Watch? | Action or Answer/Reject Possible on Watch? | Action Actually Recorded by Android App? | Audio Audible from Watch Speaker? | Android Version | Companion App Name & Version | Notes |
+| Probe | Watch Buzzed or Rang? | Text / Caller Name Shown on Watch? | Action or Answer/Reject Possible on Watch? | Action Actually Recorded by Android App? | Audio Audible from Watch Speaker? | Android Version | Companion App Name & Version | Notes (observed by the user) |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **Probe 1: Notification Actions** | | | | | N/A | | Da Fit (v: ) | |
-| **Probe 2: Telecom Incoming Call** | | | | | | | Da Fit (v: ) | |
-| **Probe 3: Alarm & TTS Audio** | | | N/A | N/A | | | Da Fit (v: ) | |
+| **Probe 1: Notification Actions** | Yes (buzzed) | Yes (text shown) | No (text only) | No | N/A | Android 16 | Da Fit 2.9.24-1 | Notification text only; Da Fit / RTOS strips action buttons |
+| **Probe 2: Telecom Incoming Call** | Yes (rang) | Yes (caller ID shown) | Yes (answer & reject work) | Yes (logged) | Yes | Android 16 | Da Fit 2.9.24-1 | Call answer/reject works via Bluetooth HFP |
+| **Probe 3: Alarm & TTS Audio** | Yes (played) | N/A | N/A | N/A | Yes | Android 16 | Da Fit 2.9.24-1 | Alarm audio plays from the watch speaker |
+
+### 6.1 Empirical Conclusions (Observed by the User)
+1. **Interactive Notification Buttons (Unsupported):** The Da Fit companion app relays text strings to the BSW052 display but discards native Android `NotificationCompat.Action` buttons. Patients cannot confirm doses via notification tap on the watch.
+2. **Bluetooth Phone Call Actions (Supported):** Self-managed incoming calls successfully ring the watch with caller name `"MedMate TEST: Metformin 500 mg"` and expose working Answer / Reject buttons on the watch screen. Answering registers on the phone.
+3. **Wrist Speaker Audio (Supported):** Routing audio to the Bluetooth hands-free / SCO channel enables alarm sounds and spoken medication reminders to play aloud directly from the watch wrist speaker.
 
 ---
 
