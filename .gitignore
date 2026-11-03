@@ -1,10 +1,45 @@
+# Virtual environments & Dependencies
 .venv/
 venv/
+ENV/
+env/
+node_modules/
+
+# Secrets & Environment Variables
 .env
+.env.*
+!.env.example
+
+# Databases & Backups
 *.db
+*.db-shm
+*.db-wal
 *.db.bak
 medmate.db
+medmate.db.bak
+
+# Python bytecode & Caches
 __pycache__/
+*.py[cod]
+*$py.class
 .pytest_cache/
-*.pyc
+.coverage
+htmlcov/
+
+# Logs
 *.log
+
+# Operating System & IDEs
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build & Distribution
+build/
+dist/
+*.egg-info/
