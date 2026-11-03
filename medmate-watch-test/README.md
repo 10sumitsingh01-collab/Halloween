@@ -84,3 +84,4 @@ Before running tests, ensure the companion app and Bluetooth links are properly 
 3. Confirm the phone is connected to the watch over Bluetooth inside Da Fit.
 4. For Probes 2 & 3: Ensure the watch is also connected as a Bluetooth phone / audio device in Android's system Bluetooth settings (e.g. `BSW052_Phone`).
 5. Disable battery optimization for Da Fit in Android system settings.
+
