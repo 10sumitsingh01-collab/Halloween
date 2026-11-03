@@ -19,3 +19,4 @@ class AlertLog(Base):
     status = Column(String(64), nullable=False, default="sent")
 
     patient = relationship("Patient", backref="alert_logs")
+

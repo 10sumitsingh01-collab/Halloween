@@ -47,3 +47,4 @@ def downgrade() -> None:
         batch_op.drop_index(batch_op.f('ix_alert_logs_id'))
 
     op.drop_table('alert_logs')
+

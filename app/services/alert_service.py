@@ -142,3 +142,4 @@ def process_assistant_alert(
         caregivers_notified=notified_count,
         patient_message=patient_msg,
     )
+

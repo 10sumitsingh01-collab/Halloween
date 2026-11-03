@@ -681,3 +681,4 @@ def test_alembic_history_eight_revisions():
     assert len(revisions) == 8, f"Expected 8 revisions in alembic history, got {len(revisions)}"
     head = script.get_current_head()
     assert head == "0008abcdef01"
+
