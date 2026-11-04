@@ -1,5 +1,8 @@
 # MedMate Backend (Layers 1, 2 & 3: Dose Engine)
 
+> [!WARNING]
+> **Safety Notice:** This is an experimental project, not a medical device, and not intended for real patient care.
+
 MedMate is a deterministic medication assistant backend for elderly patients, built with FastAPI, SQLAlchemy 2.x, Alembic, and Pydantic v2.
 
 ---

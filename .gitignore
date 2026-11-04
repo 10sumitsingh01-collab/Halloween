@@ -9,12 +9,24 @@ node_modules/
 .env
 .env.*
 !.env.example
+secrets.env.enc
+*.env.enc
+
+# Hermes settings & keys
+hermes.json
+hermes.env
+.hermes*
+*hermes*setting*
+*hermes*key*
+*hermes*secret*
 
 # Databases & Backups
 *.db
 *.db-shm
 *.db-wal
 *.db.bak
+*.sqlite
+*.sqlite3
 medmate.db
 medmate.db.bak
 
